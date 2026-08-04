@@ -1,0 +1,17 @@
+# Virtual environments
+.ic-env/
+.venv/
+venv/
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+
+# Editor and operating-system files
+.vscode/
+.DS_Store
+
+# Local caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
