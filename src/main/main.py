@@ -52,7 +52,9 @@ def main():
     mouse_is_down = False
     clap_control = DoubleClapControl()
     right_pinch_active = False
-    previous_scroll_y = None
+    smoothed_scroll_y = None
+    scroll_anchor_y = None
+    last_scroll_time = 0.0
 
     try:
         clap_control.start()
@@ -133,9 +135,15 @@ def main():
                             left_hand_found = True
 
                             if controls_enabled:
-                                previous_scroll_y = scroll_with_left_hand(
+                                (
+                                    smoothed_scroll_y,
+                                    scroll_anchor_y,
+                                    last_scroll_time,
+                                ) = scroll_with_left_hand(
                                     hand_landmarks,
-                                    previous_scroll_y,
+                                    smoothed_scroll_y,
+                                    scroll_anchor_y,
+                                    last_scroll_time,
                                 )
 
                         height, width, _ = img.shape
@@ -188,11 +196,15 @@ def main():
                     previous_x, previous_y = pyautogui.position()
 
                 if not left_hand_found:
-                    previous_scroll_y = None
+                    smoothed_scroll_y = None
+                    scroll_anchor_y = None
+                    last_scroll_time = 0.0
 
                 if not controls_enabled:
                     right_pinch_active = False
-                    previous_scroll_y = None
+                    smoothed_scroll_y = None
+                    scroll_anchor_y = None
+                    last_scroll_time = 0.0
                     previous_x, previous_y = pyautogui.position()
 
                 current_time = time.perf_counter()
@@ -274,38 +286,72 @@ def right_click_mouse(hand_landmarks, right_pinch_active):
     return right_pinching
 
 
-def get_handedness(results, hand_index):
-    # Detection runs after cv2.flip(), so MediaPipe sees a mirrored selfie image.
+def get_handedness(results, hand_index, min_confidence=0.80):
     if hand_index >= len(results.handedness) or not results.handedness[hand_index]:
         return "Unknown"
 
-    return results.handedness[hand_index][0].category_name or "Unknown"
+    category = results.handedness[hand_index][0]
+
+    if category.score is None or category.score < min_confidence:
+        return "Unknown"
+
+    detected_hand = category.category_name
+
+    # The preview is mirrored, so swap the model label to match the real hand.
+    if detected_hand == "Left":
+        return "Right"
+
+    if detected_hand == "Right":
+        return "Left"
+
+    return "Unknown"
 
 
 def scroll_with_left_hand(
     hand_landmarks,
-    previous_scroll_y,
-    dead_zone=0.012,
-    sensitivity=120,
-    max_steps=6,
+    previous_smoothed_y,
+    scroll_anchor_y,
+    last_scroll_time,
+    dead_zone=0.025,
+    smoothing=0.35,
+    sensitivity=35,
+    max_steps=3,
+    scroll_interval=0.08,
 ):
-    palm_y = hand_landmarks[9].y
+    if not is_scroll_gesture(hand_landmarks):
+        return None, None, 0.0
 
-    if previous_scroll_y is None:
-        return palm_y
+    raw_palm_y = hand_landmarks[9].y
 
-    movement_y = palm_y - previous_scroll_y
+    if previous_smoothed_y is None or scroll_anchor_y is None:
+        return raw_palm_y, raw_palm_y, 0.0
 
-    if abs(movement_y) < dead_zone:
-        return palm_y
+    smoothed_y = previous_smoothed_y + (
+        raw_palm_y - previous_smoothed_y
+    ) * smoothing
+    displacement_y = smoothed_y - scroll_anchor_y
 
-    scroll_steps = round(-movement_y * sensitivity)
-    scroll_steps = max(-max_steps, min(max_steps, scroll_steps))
+    if abs(displacement_y) < dead_zone:
+        return smoothed_y, scroll_anchor_y, last_scroll_time
 
-    if scroll_steps != 0:
-        pyautogui.scroll(scroll_steps)
+    current_time = time.monotonic()
 
-    return palm_y
+    if current_time - last_scroll_time < scroll_interval:
+        return smoothed_y, scroll_anchor_y, last_scroll_time
+
+    scroll_speed = max(1, round(abs(displacement_y) * sensitivity))
+    scroll_speed = min(max_steps, scroll_speed)
+    scroll_steps = -scroll_speed if displacement_y > 0 else scroll_speed
+    pyautogui.scroll(scroll_steps)
+
+    return smoothed_y, scroll_anchor_y, current_time
+
+
+def is_scroll_gesture(hand_landmarks):
+    index_extended = hand_landmarks[8].y < hand_landmarks[6].y
+    middle_extended = hand_landmarks[12].y < hand_landmarks[10].y
+
+    return index_extended and middle_extended
 
 
 def move_cursor(hand_landmarks, previous_x, previous_y):
