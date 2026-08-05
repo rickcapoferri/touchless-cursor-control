@@ -1,6 +1,6 @@
 # Touchless Cursor Control
 
-> **Status: Work in progress.** I am currently building and improving this project.
+> **Status: Still improving.** This is an active work in progress, and I am continuing to test and refine the controls.
 
 A webcam-based hand-tracking prototype that controls the macOS cursor without touching a mouse. The project uses MediaPipe for real-time hand landmarks, OpenCV for webcam input, and PyAutoGUI for desktop mouse actions.
 
@@ -12,20 +12,23 @@ A webcam-based hand-tracking prototype that controls the macOS cursor without to
 - Thumb-and-index pinch detection
 - Pinch to click
 - Hold the pinch to drag
+- Thumb-and-middle-finger pinch to right click
+- Right-hand-only cursor and click control
+- Left-hand vertical movement to scroll
+- Double-clap activation to turn hand controls on and off
 - Mirrored camera preview with landmark visualization and FPS
 
 ## Currently Working On
 
-- Detecting and distinguishing left and right hands
-- Restricting cursor and click control to the right hand
-- Adding left-hand scrolling gestures
-- Double-clap activation to turn hand controls on and off
 - Improving cursor smoothing and gesture reliability
+- Calibrating left-hand scroll speed and dead-zone behavior
+- Reducing accidental clap and pinch detections
 
 ## Project Structure
 
 ```text
 src/main/
+├── clap_control.py       # Double-clap audio detection
 ├── hand_landmarker.task  # MediaPipe hand model
 └── main.py               # Current application
 ```
@@ -46,7 +49,7 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-On macOS, allow VS Code or Terminal to access the **Camera** and **Accessibility** controls under **System Settings > Privacy & Security**.
+On macOS, allow VS Code or Terminal to access the **Camera**, **Microphone**, and **Accessibility** controls under **System Settings > Privacy & Security**.
 
 ## Run
 
@@ -58,9 +61,12 @@ python src/main/main.py
 
 Controls:
 
-- Move your hand to control the cursor.
-- Pinch your thumb and index finger to click.
-- Hold the pinch while moving to drag.
+- Double clap to turn hand controls on or off.
+- Move your right hand to control the cursor.
+- Pinch your right thumb and index finger to click.
+- Hold the right-hand pinch while moving to drag.
+- Pinch your right thumb and middle finger to right click.
+- Move your left hand upward or downward to scroll in that direction.
 - Press `Q` in the camera window to quit.
 
 ## Technology
@@ -69,5 +75,6 @@ Controls:
 - MediaPipe Hand Landmarker
 - OpenCV
 - PyAutoGUI
+- SoundDevice
 
 The included `hand_landmarker.task` model is provided by the [MediaPipe Hand Landmarker project](https://developers.google.com/edge/mediapipe/solutions/vision/hand_landmarker).
