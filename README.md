@@ -12,22 +12,15 @@ A webcam-based hand-tracking prototype that controls the macOS cursor without to
 - Thumb-and-index pinch detection
 - Pinch to click
 - Hold the pinch to drag
-- Thumb-and-middle-finger pinch to right click
-- Right-hand-only cursor and click control
-- Experimental left-hand two-finger vertical scrolling
+- Thumb-and-ring-finger pinch to right click
+- Single-hand cursor and gesture control
 - Double-clap activation to turn hand controls on and off
 - Mirrored camera preview with landmark visualization and FPS
 
 ## Currently Working On
 
 - Improving cursor smoothing and gesture reliability
-- Calibrating left-hand scroll speed and dead-zone behavior
 - Reducing accidental clap and pinch detections
-
-## Known Limitations
-
-- Left-hand scrolling can currently interfere with the cursor position.
-- Downward scrolling is not working reliably yet.
 
 ## Project Structure
 
@@ -67,12 +60,17 @@ python src/main/main.py
 Controls:
 
 - Double clap to turn hand controls on or off.
-- Move your right hand to control the cursor.
-- Pinch your right thumb and index finger to click.
-- Hold the right-hand pinch while moving to drag.
-- Pinch your right thumb and middle finger to right click.
-- Hold up your left index and middle fingers to set a neutral point. Hold the hand above or below that point to scroll.
+- Move one hand to control the cursor.
+- Pinch your thumb and index finger to click.
+- Hold the pinch while moving to drag.
+- Pinch your thumb and ring finger to right click.
 - Press `Q` in the camera window to quit.
+
+## Stability Notes
+
+- Scrolling is not implemented in the current version because it reduced stability and introduced gesture conflicts.
+- For the best experience, show only one hand at a time to the camera, because two hands can confuse the tracker.
+- Gesture reliability is good for the current feature set.
 
 ## Technology
 

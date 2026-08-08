@@ -33,7 +33,7 @@ def main():
     options = HandLandmarkerOptions(
         base_options=BaseOptions(model_asset_path=str(MODEL_PATH)),
         running_mode=RunningMode.VIDEO,
-        num_hands=2,
+        num_hands=1,
         min_hand_detection_confidence=0.5,
         min_hand_presence_confidence=0.5,
         min_tracking_confidence=0.5,
@@ -51,10 +51,7 @@ def main():
     previous_time = 0
     mouse_is_down = False
     clap_control = DoubleClapControl()
-    right_pinch_active = False
-    smoothed_scroll_y = None
-    scroll_anchor_y = None
-    last_scroll_time = 0.0
+    right_click_pinch_active = False
 
     try:
         clap_control.start()
@@ -95,116 +92,67 @@ def main():
                     pyautogui.mouseUp(button="left")
                     mouse_is_down = False
 
-                right_hand_found = False
-                left_hand_found = False
-
                 if results.hand_landmarks:
-                    for hand_index, hand_landmarks in enumerate(
-                        results.hand_landmarks
-                    ):
-                        handedness = get_handedness(results, hand_index)
+                    hand_landmarks = results.hand_landmarks[0]
 
-                        if handedness == "Right":
-                            right_hand_found = True
-
-                            if controls_enabled:
-                                previous_x, previous_y = move_cursor(
-                                    hand_landmarks,
-                                    previous_x,
-                                    previous_y,
-                                )
-
-                                right_pinching = is_right_pinching(hand_landmarks)
-
-                                if right_pinching and mouse_is_down:
-                                    pyautogui.mouseUp(button="left")
-                                    mouse_is_down = False
-
-                                right_pinch_active = right_click_mouse(
-                                    hand_landmarks,
-                                    right_pinch_active,
-                                )
-
-                                if not right_pinch_active:
-                                    mouse_is_down = drag_click_mouse(
-                                        hand_landmarks,
-                                        mouse_is_down,
-                                    )
-
-                        elif handedness == "Left":
-                            left_hand_found = True
-
-                            if controls_enabled:
-                                (
-                                    smoothed_scroll_y,
-                                    scroll_anchor_y,
-                                    last_scroll_time,
-                                ) = scroll_with_left_hand(
-                                    hand_landmarks,
-                                    smoothed_scroll_y,
-                                    scroll_anchor_y,
-                                    last_scroll_time,
-                                )
-
-                        height, width, _ = img.shape
-
-                        for landmark_id, landmark in enumerate(hand_landmarks):
-                            cx = int(landmark.x * width)
-                            cy = int(landmark.y * height)
-
-                            if landmark_id in (4, 8, 12, 16, 20):
-                                cv2.circle(
-                                    img,
-                                    (cx, cy),
-                                    15,
-                                    (255, 0, 255),
-                                    cv2.FILLED,
-                                )
-
-                        wrist = hand_landmarks[0]
-                        label_x = int(wrist.x * width)
-                        label_y = max(25, int(wrist.y * height) - 15)
-                        role = {
-                            "Right": "MOUSE",
-                            "Left": "SCROLL",
-                        }.get(handedness, "UNKNOWN")
-
-                        cv2.putText(
-                            img,
-                            f"{handedness.upper()}: {role}",
-                            (label_x, label_y),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.7,
-                            (0, 255, 255),
-                            2,
-                        )
-
-                        drawing_utils.draw_landmarks(
-                            img,
+                    if controls_enabled:
+                        previous_x, previous_y = move_cursor(
                             hand_landmarks,
-                            hand_connections,
-                            drawing_styles.get_default_hand_landmarks_style(),
-                            drawing_styles.get_default_hand_connections_style(),
+                            previous_x,
+                            previous_y,
                         )
 
-                if not right_hand_found:
+                        right_click_pinching = is_right_click_pinching(
+                            hand_landmarks
+                        )
+
+                        if right_click_pinching and mouse_is_down:
+                            pyautogui.mouseUp(button="left")
+                            mouse_is_down = False
+
+                        right_click_pinch_active = right_click_mouse(
+                            hand_landmarks,
+                            right_click_pinch_active,
+                        )
+
+                        if not right_click_pinch_active:
+                            mouse_is_down = drag_click_mouse(
+                                hand_landmarks,
+                                mouse_is_down,
+                            )
+
+                    height, width, _ = img.shape
+
+                    for landmark_id, landmark in enumerate(hand_landmarks):
+                        cx = int(landmark.x * width)
+                        cy = int(landmark.y * height)
+
+                        if landmark_id in (4, 8, 12, 16, 20):
+                            cv2.circle(
+                                img,
+                                (cx, cy),
+                                15,
+                                (255, 0, 255),
+                                cv2.FILLED,
+                            )
+
+                    drawing_utils.draw_landmarks(
+                        img,
+                        hand_landmarks,
+                        hand_connections,
+                        drawing_styles.get_default_hand_landmarks_style(),
+                        drawing_styles.get_default_hand_connections_style(),
+                    )
+                else:
                     if mouse_is_down:
                         pyautogui.mouseUp(button="left")
                         mouse_is_down = False
 
-                    right_pinch_active = False
+                    right_click_pinch_active = False
                     previous_x, previous_y = pyautogui.position()
 
-                if not left_hand_found:
-                    smoothed_scroll_y = None
-                    scroll_anchor_y = None
-                    last_scroll_time = 0.0
-
                 if not controls_enabled:
-                    right_pinch_active = False
-                    smoothed_scroll_y = None
-                    scroll_anchor_y = None
-                    last_scroll_time = 0.0
+                    right_click_pinch_active = False
                     previous_x, previous_y = pyautogui.position()
 
                 current_time = time.perf_counter()
@@ -264,94 +212,26 @@ def is_pinching(hand_landmarks):
     return distance < 0.05
 
 
-def is_right_pinching(hand_landmarks):
+def is_right_click_pinching(hand_landmarks):
     thumb_tip = hand_landmarks[4]
-    middle_tip = hand_landmarks[12]
+    ring_tip = hand_landmarks[16]
 
     distance = math.hypot(
-        middle_tip.x - thumb_tip.x,
-        middle_tip.y - thumb_tip.y,
+        ring_tip.x - thumb_tip.x,
+        ring_tip.y - thumb_tip.y,
     )
 
     return distance < 0.05
 
 
-def right_click_mouse(hand_landmarks, right_pinch_active):
-    right_pinching = is_right_pinching(hand_landmarks)
+def right_click_mouse(hand_landmarks, right_click_pinch_active):
+    right_click_pinching = is_right_click_pinching(hand_landmarks)
 
     # Click only when the gesture begins.
-    if right_pinching and not right_pinch_active:
+    if right_click_pinching and not right_click_pinch_active:
         pyautogui.rightClick()
 
-    return right_pinching
-
-
-def get_handedness(results, hand_index, min_confidence=0.80):
-    if hand_index >= len(results.handedness) or not results.handedness[hand_index]:
-        return "Unknown"
-
-    category = results.handedness[hand_index][0]
-
-    if category.score is None or category.score < min_confidence:
-        return "Unknown"
-
-    detected_hand = category.category_name
-
-    # The preview is mirrored, so swap the model label to match the real hand.
-    if detected_hand == "Left":
-        return "Right"
-
-    if detected_hand == "Right":
-        return "Left"
-
-    return "Unknown"
-
-
-def scroll_with_left_hand(
-    hand_landmarks,
-    previous_smoothed_y,
-    scroll_anchor_y,
-    last_scroll_time,
-    dead_zone=0.025,
-    smoothing=0.35,
-    sensitivity=35,
-    max_steps=3,
-    scroll_interval=0.08,
-):
-    if not is_scroll_gesture(hand_landmarks):
-        return None, None, 0.0
-
-    raw_palm_y = hand_landmarks[9].y
-
-    if previous_smoothed_y is None or scroll_anchor_y is None:
-        return raw_palm_y, raw_palm_y, 0.0
-
-    smoothed_y = previous_smoothed_y + (
-        raw_palm_y - previous_smoothed_y
-    ) * smoothing
-    displacement_y = smoothed_y - scroll_anchor_y
-
-    if abs(displacement_y) < dead_zone:
-        return smoothed_y, scroll_anchor_y, last_scroll_time
-
-    current_time = time.monotonic()
-
-    if current_time - last_scroll_time < scroll_interval:
-        return smoothed_y, scroll_anchor_y, last_scroll_time
-
-    scroll_speed = max(1, round(abs(displacement_y) * sensitivity))
-    scroll_speed = min(max_steps, scroll_speed)
-    scroll_steps = -scroll_speed if displacement_y > 0 else scroll_speed
-    pyautogui.scroll(scroll_steps)
-
-    return smoothed_y, scroll_anchor_y, current_time
-
-
-def is_scroll_gesture(hand_landmarks):
-    index_extended = hand_landmarks[8].y < hand_landmarks[6].y
-    middle_extended = hand_landmarks[12].y < hand_landmarks[10].y
-
-    return index_extended and middle_extended
+    return right_click_pinching
 
 
 def move_cursor(hand_landmarks, previous_x, previous_y):
