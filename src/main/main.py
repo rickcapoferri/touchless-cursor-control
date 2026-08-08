@@ -23,6 +23,7 @@ drawing_styles = mp.tasks.vision.drawing_styles
 hand_connections = mp.tasks.vision.HandLandmarksConnections.HAND_CONNECTIONS
 
 SCREEN_WIDTH, SCREEN_HEIGHT = pyautogui.size()
+LEFT_DRAG_HOLD_DELAY = 0.25
 
 
 def main():
@@ -52,6 +53,8 @@ def main():
     mouse_is_down = False
     clap_control = DoubleClapControl()
     right_click_pinch_active = False
+    left_pinch_active = False
+    left_pinch_start_time = 0.0
 
     try:
         clap_control.start()
@@ -116,9 +119,15 @@ def main():
                         )
 
                         if not right_click_pinch_active:
-                            mouse_is_down = drag_click_mouse(
+                            (
+                                mouse_is_down,
+                                left_pinch_active,
+                                left_pinch_start_time,
+                            ) = drag_click_mouse(
                                 hand_landmarks,
                                 mouse_is_down,
+                                left_pinch_active,
+                                left_pinch_start_time,
                             )
 
                     height, width, _ = img.shape
@@ -256,18 +265,37 @@ def move_cursor(hand_landmarks, previous_x, previous_y):
     return smooth_x, smooth_y
 
 
-def drag_click_mouse(hand_landmarks, mouse_is_down):
+def drag_click_mouse(
+    hand_landmarks,
+    mouse_is_down,
+    left_pinch_active,
+    left_pinch_start_time,
+):
     pinching = is_pinching(hand_landmarks)
+    current_time = time.monotonic()
 
-    if pinching and not mouse_is_down:
-        pyautogui.mouseDown(button="left")
-        return True
+    if pinching:
+        if not left_pinch_active:
+            left_pinch_active = True
+            left_pinch_start_time = current_time
 
-    if not pinching and mouse_is_down:
-        pyautogui.mouseUp(button="left")
-        return False
+        pinch_duration = current_time - left_pinch_start_time
 
-    return mouse_is_down
+        if pinch_duration >= LEFT_DRAG_HOLD_DELAY and not mouse_is_down:
+            pyautogui.mouseDown(button="left")
+            return True, left_pinch_active, left_pinch_start_time
+
+        return mouse_is_down, left_pinch_active, left_pinch_start_time
+
+    if left_pinch_active:
+        pinch_duration = current_time - left_pinch_start_time
+
+        if mouse_is_down:
+            pyautogui.mouseUp(button="left")
+        elif pinch_duration < LEFT_DRAG_HOLD_DELAY:
+            pyautogui.click(button="left")
+
+    return False, False, 0.0
 
 
 if __name__ == "__main__":
