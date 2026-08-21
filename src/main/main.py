@@ -132,18 +132,6 @@ def main():
 
                     height, width, _ = img.shape
 
-                    for landmark_id, landmark in enumerate(hand_landmarks):
-                        cx = int(landmark.x * width)
-                        cy = int(landmark.y * height)
-
-                        if landmark_id in (4, 8, 12, 16, 20):
-                            cv2.circle(
-                                img,
-                                (cx, cy),
-                                15,
-                                (255, 0, 255),
-                                cv2.FILLED,
-                            )
 
                     drawing_utils.draw_landmarks(
                         img,
@@ -212,25 +200,42 @@ def main():
 def is_pinching(hand_landmarks):
     thumb_tip = hand_landmarks[4]
     index_finger_tip = hand_landmarks[8]
+    index_base = hand_landmarks[5]
+    pinky_base = hand_landmarks[17]
+
+    index_base_to_pinky_base_distance = math.hypot(
+        index_base.x - pinky_base.x,
+        index_base.y - pinky_base.y,
+    )
 
     distance = math.hypot(
         index_finger_tip.x - thumb_tip.x,
         index_finger_tip.y - thumb_tip.y,
     )
 
-    return distance < 0.05
+    pinch_ratio = distance / index_base_to_pinky_base_distance
+
+    return pinch_ratio < 0.5
 
 
 def is_right_click_pinching(hand_landmarks):
     thumb_tip = hand_landmarks[4]
     ring_tip = hand_landmarks[16]
+    index_base = hand_landmarks[5]
+    pinky_base = hand_landmarks[17]
+    index_base_to_pinky_base_distance = math.hypot(
+        index_base.x - pinky_base.x,
+        index_base.y - pinky_base.y,
+    )
 
     distance = math.hypot(
         ring_tip.x - thumb_tip.x,
         ring_tip.y - thumb_tip.y,
     )
 
-    return distance < 0.05
+    pinch_ratio = distance / index_base_to_pinky_base_distance
+
+    return pinch_ratio < 0.5
 
 
 def right_click_mouse(hand_landmarks, right_click_pinch_active):

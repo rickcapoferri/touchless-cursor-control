@@ -9,7 +9,7 @@ A webcam-based hand-tracking prototype that controls the macOS cursor without to
 - Real-time webcam hand tracking
 - Cursor movement from a stable palm landmark
 - Expanded camera-to-screen coordinate mapping
-- Thumb-and-index pinch detection
+- Thumb-and-index pinch detection normalized by hand width
 - Pinch to click
 - Hold the pinch to drag
 - Thumb-and-ring-finger pinch to right click
@@ -21,6 +21,7 @@ A webcam-based hand-tracking prototype that controls the macOS cursor without to
 
 - Improving cursor smoothing and gesture reliability
 - Reducing accidental clap and pinch detections
+- Refining pinch thresholds using normalized distances instead of fixed absolute values
 
 ## Project Structure
 
@@ -71,6 +72,7 @@ Controls:
 - Scrolling is not implemented in the current version because it reduced stability and introduced gesture conflicts.
 - For the best experience, show only one hand at a time to the camera, because two hands can confuse the tracker.
 - Gesture reliability is good for the current feature set.
+- Pinch detection is normalized using the distance between landmarks `5` and `17` as a hand-width reference, which makes the gesture less sensitive to camera distance.
 
 ## Technology
 
