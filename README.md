@@ -37,8 +37,8 @@ src/main/
 Create and activate a virtual environment from the project root:
 
 ```bash
-python3.13 -m venv .ic-env
-source .ic-env/bin/activate
+python3.13 -m venv .venv
+source .venv/bin/activate
 ```
 
 Install the dependencies:
