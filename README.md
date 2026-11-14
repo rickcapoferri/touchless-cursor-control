@@ -13,7 +13,8 @@ A webcam-based hand-tracking prototype that controls the macOS cursor without to
 - Pinch to click
 - Hold the pinch to drag
 - Thumb-and-ring-finger pinch to right click
-- Single-hand cursor and gesture control
+- Right-hand cursor and gesture control
+- Left-hand pinch-and-move scrolling with two-hand tracking
 - Double-clap activation to turn hand controls on and off
 - Mirrored camera preview with landmark visualization and FPS
 
@@ -28,6 +29,7 @@ A webcam-based hand-tracking prototype that controls the macOS cursor without to
 ```text
 src/main/
 ├── clap_control.py       # Double-clap audio detection
+├── scroll_control.py     # Left-hand scroll gesture and hand selection
 ├── hand_landmarker.task  # MediaPipe hand model
 └── main.py               # Current application
 ```
@@ -61,17 +63,22 @@ python src/main/main.py
 Controls:
 
 - Double clap to turn hand controls on or off.
-- Move one hand to control the cursor.
-- Pinch your thumb and index finger to click.
+- Move your right hand to control the cursor.
+- Pinch your right thumb and index finger to click.
 - Hold the pinch while moving to drag.
-- Pinch your thumb and ring finger to right click.
+- Pinch your right thumb and ring finger to right click.
+- To scroll, touch your left thumb and index finger together in a relaxed pinch. Other fingers can rest naturally; no two-finger pose is required. When `LEFT: PINCHED - MOVE TO SCROLL` appears, move the pinched hand vertically. Swipe up to push the content up, down to pull it down.
+- Release the pinch to reposition. Stop moving to stop immediately, with no momentum. Scrolling pauses during a right-hand drag.
+- The preview shows left-hand tracking and the normalized pinch gap. A gap below 0.40 engages scrolling; opening above 0.65 releases it, preventing flicker near the activation threshold.
+- If your physical left hand is labeled `Right`, show only your left hand and press `L` while the preview is focused. This calibrates hand assignment for the current session.
 - Press `Q` in the camera window to quit.
 
 ## Stability Notes
 
-- Scrolling is not implemented in the current version because it reduced stability and introduced gesture conflicts.
-- For the best experience, show only one hand at a time to the camera, because two hands can confuse the tracker.
-- Gesture reliability is good for the current feature set.
+- Two-hand scrolling is experimental and still needs live webcam testing. Keep hands apart and palms visible for reliable hand classification.
+- Scrolling tracks the palm while the left thumb and index are pinched, accumulating fractional wheel steps for small swipes. Tune `sensitivity` in `ScrollControl` in `src/main/scroll_control.py` (default: 12 wheel steps per palm width). Actual scroll distance depends on the app and macOS settings.
+- Right hand controls the cursor; left hand only scrolls. Handedness defaults to MediaPipe Tasks labels corrected for the mirrored camera image, with an `L` calibration override.
+- A small dead zone (2.5% of palm width) filters tremor. Losing the hand, disabling controls, or releasing the pinch resets scrolling. Tracking gaps and sudden landmark jumps are discarded. The preview labels each detected hand to help check left/right assignment.
 - Pinch detection is normalized using the distance between landmarks `5` and `17` as a hand-width reference, which makes the gesture less sensitive to camera distance.
 
 ## Technology

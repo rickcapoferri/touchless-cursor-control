@@ -7,6 +7,7 @@ import mediapipe as mp
 import pyautogui
 
 from clap_control import DoubleClapControl
+from scroll_control import ScrollControl, pinch_ratio, select_hands
 
 pyautogui.PAUSE = 0
 
@@ -34,7 +35,7 @@ def main():
     options = HandLandmarkerOptions(
         base_options=BaseOptions(model_asset_path=str(MODEL_PATH)),
         running_mode=RunningMode.VIDEO,
-        num_hands=1,
+        num_hands=2,
         min_hand_detection_confidence=0.5,
         min_hand_presence_confidence=0.5,
         min_tracking_confidence=0.5,
@@ -55,6 +56,8 @@ def main():
     right_click_pinch_active = False
     left_pinch_active = False
     left_pinch_start_time = 0.0
+    scroll_control = ScrollControl()
+    left_label = "Right"  # Default for mirrored Tasks input; L calibrates it.
 
     try:
         clap_control.start()
@@ -91,48 +94,53 @@ def main():
 
                 controls_enabled = clap_control.is_enabled()
 
-                if not controls_enabled and mouse_is_down:
-                    pyautogui.mouseUp(button="left")
-                    mouse_is_down = False
+                hands = select_hands(results, left_label)
+                cursor_hand = hands.get("Right")
 
-                if results.hand_landmarks:
-                    hand_landmarks = results.hand_landmarks[0]
-
-                    if controls_enabled:
-                        previous_x, previous_y = move_cursor(
-                            hand_landmarks,
-                            previous_x,
-                            previous_y,
-                        )
-
-                        right_click_pinching = is_right_click_pinching(
-                            hand_landmarks
-                        )
-
-                        if right_click_pinching and mouse_is_down:
+                if controls_enabled and cursor_hand is not None:
+                    previous_x, previous_y = move_cursor(
+                        cursor_hand, previous_x, previous_y,
+                    )
+                    right_click_pinching = is_right_click_pinching(cursor_hand)
+                    if right_click_pinching:
+                        if mouse_is_down:
                             pyautogui.mouseUp(button="left")
                             mouse_is_down = False
+                        left_pinch_active = False
+                        left_pinch_start_time = 0.0
 
-                        right_click_pinch_active = right_click_mouse(
-                            hand_landmarks,
-                            right_click_pinch_active,
+                    right_click_pinch_active = right_click_mouse(
+                        cursor_hand, right_click_pinch_active,
+                    )
+                    if not right_click_pinch_active:
+                        (
+                            mouse_is_down,
+                            left_pinch_active,
+                            left_pinch_start_time,
+                        ) = drag_click_mouse(
+                            cursor_hand,
+                            mouse_is_down,
+                            left_pinch_active,
+                            left_pinch_start_time,
                         )
+                else:
+                    if mouse_is_down:
+                        pyautogui.mouseUp(button="left")
+                        mouse_is_down = False
+                    right_click_pinch_active = False
+                    left_pinch_active = False
+                    left_pinch_start_time = 0.0
+                    previous_x, previous_y = pyautogui.position()
 
-                        if not right_click_pinch_active:
-                            (
-                                mouse_is_down,
-                                left_pinch_active,
-                                left_pinch_start_time,
-                            ) = drag_click_mouse(
-                                hand_landmarks,
-                                mouse_is_down,
-                                left_pinch_active,
-                                left_pinch_start_time,
-                            )
+                scroll_steps = scroll_control.update(
+                    hands.get("Left"),
+                    time.monotonic(),
+                    enabled=controls_enabled and not mouse_is_down,
+                )
+                if scroll_steps:
+                    pyautogui.scroll(scroll_steps)
 
-                    height, width, _ = img.shape
-
-
+                for hand_landmarks in results.hand_landmarks:
                     drawing_utils.draw_landmarks(
                         img,
                         hand_landmarks,
@@ -140,17 +148,6 @@ def main():
                         drawing_styles.get_default_hand_landmarks_style(),
                         drawing_styles.get_default_hand_connections_style(),
                     )
-                else:
-                    if mouse_is_down:
-                        pyautogui.mouseUp(button="left")
-                        mouse_is_down = False
-
-                    right_click_pinch_active = False
-                    previous_x, previous_y = pyautogui.position()
-
-                if not controls_enabled:
-                    right_click_pinch_active = False
-                    previous_x, previous_y = pyautogui.position()
 
                 current_time = time.perf_counter()
 
@@ -184,10 +181,56 @@ def main():
                     2,
                 )
 
+                left_hand = hands.get("Left")
+                if scroll_control.active:
+                    scroll_text = "LEFT: PINCHED - MOVE TO SCROLL"
+                elif left_hand is not None:
+                    scroll_text = "LEFT: PINCH THUMB + INDEX"
+                else:
+                    scroll_text = "SHOW LEFT HAND TO SCROLL"
+                if not controls_enabled:
+                    scroll_text = "DOUBLE CLAP TO ENABLE"
+                elif mouse_is_down:
+                    scroll_text = "SCROLL PAUSED DURING DRAG"
+                cv2.putText(
+                    img, scroll_text, (10, 150), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.65, (0, 255, 0) if scroll_control.active else (180, 180, 180), 2,
+                )
+                for name, landmarks in hands.items():
+                    wrist = landmarks[0]
+                    cv2.putText(
+                        img, name, (int(wrist.x * img.shape[1]),
+                                    int(wrist.y * img.shape[0]) - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2,
+                    )
+
+                # Explicit status distinguishes missing tracking from a missed pinch.
+                ratio = pinch_ratio(left_hand) if left_hand is not None else None
+                diagnostic = f"Pinch gap: {ratio:.2f}" if ratio is not None else "Left hand not tracked"
+                cv2.putText(img, diagnostic, (10, 180), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.6, (180, 180, 180), 1)
+                cv2.putText(img, "Wrong hand? Show LEFT only, press L", (10, 210),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (180, 180, 180), 1)
                 cv2.imshow("Hand Landmarker", img)
 
-                if cv2.waitKey(1) & 0xFF == ord("q"):
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord("q"):
                     break
+                if key == ord("l"):
+                    if len(results.handedness) == 1 and results.handedness[0]:
+                        category = results.handedness[0][0]
+                        if category.score >= 0.75:
+                            left_label = category.category_name
+                            scroll_control.reset()
+                            if mouse_is_down:
+                                pyautogui.mouseUp(button="left")
+                                mouse_is_down = False
+                            left_pinch_active = right_click_pinch_active = False
+                            left_pinch_start_time = 0.0
+                            previous_x, previous_y = pyautogui.position()
+                            print("Left hand calibrated for this session.")
+                    else:
+                        print("To calibrate, show only your left hand and press L.")
     finally:
         if mouse_is_down:
             pyautogui.mouseUp(button="left")
@@ -213,7 +256,7 @@ def is_pinching(hand_landmarks):
         index_finger_tip.y - thumb_tip.y,
     )
 
-    pinch_ratio = distance / index_base_to_pinky_base_distance
+    pinch_ratio = distance / max(index_base_to_pinky_base_distance, 1e-6)
 
     return pinch_ratio < 0.5
 
@@ -233,7 +276,7 @@ def is_right_click_pinching(hand_landmarks):
         ring_tip.y - thumb_tip.y,
     )
 
-    pinch_ratio = distance / index_base_to_pinky_base_distance
+    pinch_ratio = distance / max(index_base_to_pinky_base_distance, 1e-6)
 
     return pinch_ratio < 0.5
 
