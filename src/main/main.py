@@ -26,6 +26,13 @@ hand_connections = mp.tasks.vision.HandLandmarksConnections.HAND_CONNECTIONS
 SCREEN_WIDTH, SCREEN_HEIGHT = pyautogui.size()
 LEFT_DRAG_HOLD_DELAY = 0.25
 
+# Map a smaller camera region on the user's right to the entire screen.
+# Coordinates refer to the mirrored preview (0 = left/top, 1 = right/bottom).
+CURSOR_X_MIN = 0.40
+CURSOR_X_MAX = 0.84
+CURSOR_Y_MIN = 0.22
+CURSOR_Y_MAX = 0.78
+
 
 def main():
     if not MODEL_PATH.exists():
@@ -293,11 +300,10 @@ def right_click_mouse(hand_landmarks, right_click_pinch_active):
 
 def move_cursor(hand_landmarks, previous_x, previous_y):
     hand_cursor = hand_landmarks[9]
-    scale = 1.5
     smoothing = 0.50
 
-    mapped_x = (hand_cursor.x - 0.5) * scale + 0.5
-    mapped_y = (hand_cursor.y - 0.5) * scale + 0.5
+    mapped_x = (hand_cursor.x - CURSOR_X_MIN) / (CURSOR_X_MAX - CURSOR_X_MIN)
+    mapped_y = (hand_cursor.y - CURSOR_Y_MIN) / (CURSOR_Y_MAX - CURSOR_Y_MIN)
 
     mapped_x = max(0.0, min(1.0, mapped_x))
     mapped_y = max(0.0, min(1.0, mapped_y))

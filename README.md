@@ -64,6 +64,7 @@ Controls:
 
 - Double clap to turn hand controls on or off.
 - Move your right hand to control the cursor.
+- The full screen maps to a smaller region toward your right in the mirrored camera preview: 40–84% of image width and 22–78% of image height. This reduces sideways travel by about 34% and vertical travel by 16% compared with the previous mapping. Tune `CURSOR_X_MIN`, `CURSOR_X_MAX`, `CURSOR_Y_MIN`, and `CURSOR_Y_MAX` in `src/main/main.py` to adjust the region.
 - Pinch your right thumb and index finger to click.
 - Hold the pinch while moving to drag.
 - Pinch your right thumb and ring finger to right click.
