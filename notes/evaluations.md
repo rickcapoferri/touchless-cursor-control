@@ -1,6 +1,27 @@
 # Evaluation Notes
 
-## Baseline
+## Current Manual Evaluation Checklist
+
+The checklist below is for the current implementation. Results have not yet been recorded here. Automated tests cover scrolling logic and hand assignment using synthetic landmarks; they do not establish live usability.
+
+Record the commit, macOS and Python versions, camera, lighting, and approximate hand-to-camera distance with each session.
+
+| Check | Expected behavior |
+| --- | --- |
+| Activation | Controls start off when the microphone starts; a double clap enables them. Check for accidental clicks immediately afterward. |
+| Cursor reach | Reach all four screen edges from a comfortable right-hand position. |
+| Left click | A brief thumb–index pinch clicks once on release. |
+| Drag | Holding the pinch for at least 0.25 seconds holds the left button; opening it drops the item. Check for unintended releases. |
+| Right click | Thumb–ring pinch produces one right click per gesture. |
+| Scroll | Left thumb–index pinch and vertical movement scroll in the intended direction. A stationary hand produces no scrolling. |
+| Scroll reset | Releasing the pinch or losing left-hand tracking stops scrolling; reacquiring the hand does not jump the page. |
+| Two-hand interaction | Cursor movement and scrolling can work together; scrolling pauses while a right-hand drag is active. |
+| Hand assignment | Physical hands match preview labels; showing only the left hand and pressing `L` corrects a reversed assignment. |
+| Disable and quit | Disabling controls or quitting during a drag releases the left mouse button. |
+
+## Historical Baseline — 2026-08-21
+
+The observations below describe an earlier version. In particular, the removed lateral-scroll experiment is separate from the current left-hand vertical scrolling feature. These observations have not been revalidated against the current code.
 
 - Project: Touchless Cursor Control
 - Date: 2026-08-21
@@ -17,7 +38,7 @@
 - Clap threshold: `0.35`
 - Clap release threshold: `0.12`
 
-## Observed Errors
+### Observed Errors
 
 - Immediate click events can happen right after the clap gesture.
   - Possible fix: wait about `1 second` before enabling controls after the clap.
@@ -34,14 +55,14 @@
 - When the hand is not straight or stable, accidental clicks can happen.
   - Likely cause: camera limitations and hand pose variation, not only code.
 
-## Notes
+### Notes
 
 - Right click currently uses thumb + ring finger.
 - Left click uses thumb + index finger.
 - Drag is based on holding the left pinch long enough before releasing.
 - For the cleanest testing, show only one hand at a time to the camera.
 
-## Next Fix Candidates
+### Fix Candidates at the Time
 
 1. Add a short activation delay after the clap.
 2. Improve drag stability.
