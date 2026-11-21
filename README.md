@@ -1,8 +1,12 @@
 # Touchless Cursor Control
 
-> **Status: Still improving.** This is an active work in progress, and I am continuing to test and refine the controls.
+> **Status: experimental prototype.** Core controls are implemented; live reliability and two-hand scrolling are still being evaluated.
 
 A webcam-based hand-tracking prototype that controls the macOS cursor without touching a mouse. The project uses MediaPipe for real-time hand landmarks, OpenCV for webcam input, and PyAutoGUI for desktop mouse actions.
+
+The central problem is turning noisy landmark measurements into predictable desktop actions: a small tracking error should not become an unintended click or scroll. The implementation combines geometric features, temporal smoothing, gesture state, and explicit reset behavior.
+
+MediaPipe supplies the pretrained hand model. The application code implements the coordinate mapping, gesture rules, click/drag timing, scrolling, hand assignment, and audio activation. No custom model training is included.
 
 ## Current Features
 
@@ -18,11 +22,40 @@ A webcam-based hand-tracking prototype that controls the macOS cursor without to
 - Double-clap activation to turn hand controls on and off
 - Mirrored camera preview with landmark visualization and FPS
 
-## Current Priorities
+## How It Works
 
-- Improving cursor smoothing and gesture reliability
-- Reducing accidental clap and pinch detections
-- Refining pinch thresholds using normalized distances instead of fixed absolute values
+```text
+Webcam → MediaPipe landmarks → hand assignment → cursor / gesture logic → mouse events
+Microphone → amplitude peaks + double-clap timing → controls enabled / disabled
+```
+
+### Geometric Features and Cursor Smoothing
+
+Pinches use a dimensionless distance ratio in normalized image coordinates:
+
+```text
+pinch ratio = distance(thumb tip, finger tip) / distance(index base, little-finger base)
+```
+
+Dividing by palm width reduces sensitivity to hand size in the image and distance from the camera. It does not remove changes caused by hand rotation, occlusion, or perspective. Thumb–index and thumb–ring ratios below `0.50` trigger the right-hand click rules.
+
+Landmark `9` supplies the cursor position. Its coordinates are mapped from a restricted camera region to the screen, clamped, and smoothed recursively:
+
+```text
+cursor[t] = cursor[t-1] + 0.50 × (mapped_position[t] - cursor[t-1])
+```
+
+Smoothing trades responsiveness for less visible jitter. The coefficient is fixed per frame, so its effective time response varies with frame rate.
+
+### Gesture State and Scrolling
+
+- **Click versus drag:** a pinch released before `0.25 s` clicks; holding it longer presses the mouse button until release. Elapsed time uses a monotonic clock.
+- **Scroll hysteresis:** the left-hand pinch engages below `0.40` and releases at `0.65`. Separate thresholds reduce repeated toggling near the boundary.
+- **Movement filtering:** scrolling follows average palm position, normalized by palm width. A dead zone suppresses small movements; fractional wheel steps accumulate to preserve small swipes.
+- **Reset behavior:** hand loss, pinch release, or disabled controls resets scrolling. Gaps over `0.25 s` re-anchor movement; sudden jumps over `1.5` palm widths are discarded. Output is capped at eight wheel steps per frame.
+- **Audio activation:** amplitude peaks and inter-clap timing toggle controls. This is a threshold-based detector, so other sharp sounds can trigger it.
+
+These are hand-tuned rules, not parameters estimated from a labeled gesture dataset.
 
 ## Project Structure
 
@@ -32,6 +65,10 @@ src/main/
 ├── scroll_control.py     # Left-hand scroll gesture and hand selection
 ├── hand_landmarker.task  # MediaPipe hand model
 └── main.py               # Current application
+tests/
+└── test_scroll_control.py # Synthetic landmark and hand-assignment tests
+notes/
+└── evaluations.md        # Historical observations and manual test checklist
 ```
 
 ## Setup
@@ -141,6 +178,12 @@ Run the automated scrolling and hand-assignment checks from the project root:
 python -m unittest discover -s tests -v
 ```
 
-These tests use synthetic landmarks. They do not verify live webcam tracking, microphone detection, desktop input, or gesture comfort. Two-hand scrolling still needs live validation.
+The tests cover scroll direction and magnitude, jitter rejection, hysteresis, fractional accumulation, bounded output, resets after tracking loss, and hand assignment. They also compare the same synthetic swipe sampled at two frame rates.
+
+These tests use synthetic landmarks and require only the Python standard library. They do not verify live webcam tracking, microphone detection, desktop input, click/drag behavior, or gesture comfort. Two-hand scrolling still needs live validation. No measured accuracy, latency benchmark, or user study is reported for the current version.
 
 See [evaluation notes](notes/evaluations.md) for the historical baseline and a checklist for testing the current controls.
+
+### Planned Measurements
+
+The next evaluation should record camera, lighting, hand distance, software versions, and commit alongside each session. Useful measures are false activations per minute while idle, successful clicks and drags per attempt, task completion time, and unintended scroll events. Compare raw mapping with different smoothing settings on repeated tasks to assess the jitter–responsiveness trade-off. These measurements are planned; the repository does not yet contain those results.
